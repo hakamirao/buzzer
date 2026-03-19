@@ -421,6 +421,24 @@
         $teamColor = $teamPalette[$player->team_number] ?? $teamPalette[6];
     @endphp
 
+<audio id="bell-sound" preload="auto">
+    <source src="{{ asset('sounds/bell.mp3') }}" type="audio/mpeg">
+</audio>
+
+<script>
+    const bellSound = document.getElementById('bell-sound');
+
+    function playBellSound() {
+        if (!bellSound) return;
+
+        bellSound.currentTime = 0;
+
+        bellSound.play().catch((error) => {
+            console.log('تعذر تشغيل الصوت تلقائيًا:', error);
+        });
+    }
+</script>
+
 <body
     data-player-game-id="{{ $player->game->id }}"
     style="

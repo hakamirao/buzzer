@@ -51,6 +51,34 @@ function renderPlayerCircles(players) {
     `).join('');
 }
 
+let lastWinnerId = null;
+let soundUnlocked = false;
+
+const bellSound = new Audio('/sounds/bell.mp3');
+bellSound.preload = 'auto';
+
+function unlockSound() {
+    if (soundUnlocked) return;
+
+    bellSound.play()
+        .then(() => {
+            bellSound.pause();
+            bellSound.currentTime = 0;
+            soundUnlocked = true;
+        })
+        .catch(() => {});
+}
+
+function playBellSound() {
+    bellSound.currentTime = 0;
+    bellSound.play().catch((error) => {
+        console.log('تعذر تشغيل الصوت تلقائيًا:', error);
+    });
+}
+
+document.addEventListener('click', unlockSound, { once: true });
+document.addEventListener('touchstart', unlockSound, { once: true });
+
 function initRealtime() {
     const adminGameId = document.body?.dataset?.adminGameId;
     const playerGameId = document.body?.dataset?.playerGameId;
@@ -70,6 +98,16 @@ function initRealtime() {
     window.Echo.channel(`game.${gameId}`)
         .listen('.game.state.updated', (event) => {
             console.log('Realtime event received:', event);
+
+            const shouldPlayBell =
+                event.current_winner_id &&
+                event.current_winner_id !== lastWinnerId;
+
+            if (shouldPlayBell) {
+                playBellSound();
+            }
+
+            lastWinnerId = event.current_winner_id || null;
 
             const winnerBox = document.getElementById('winner-box');
             const winnerName = document.getElementById('winner-name');
