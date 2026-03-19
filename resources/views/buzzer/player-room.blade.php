@@ -407,16 +407,8 @@
         }
     </style>
 </head>
-<body
-    data-player-game-id="{{ $player->game->id }}"
-    style="
-        --team-light: {{ $teamColor['light'] }};
-        --team-base: {{ $teamColor['base'] }};
-        --team-dark: {{ $teamColor['dark'] }};
-        --team-rgb: {{ $teamColor['rgb'] }};
-    "
->
-    @php
+
+@php
         $teamPalette = [
             1 => ['light' => '#93c5fd', 'base' => '#3b82f6', 'dark' => '#1d4ed8', 'rgb' => '59,130,246'],
             2 => ['light' => '#fca5a5', 'base' => '#ef4444', 'dark' => '#b91c1c', 'rgb' => '239,68,68'],
@@ -428,6 +420,17 @@
 
         $teamColor = $teamPalette[$player->team_number] ?? $teamPalette[6];
     @endphp
+
+<body
+    data-player-game-id="{{ $player->game->id }}"
+    style="
+        --team-light: {{ $teamColor['light'] }};
+        --team-base: {{ $teamColor['base'] }};
+        --team-dark: {{ $teamColor['dark'] }};
+        --team-rgb: {{ $teamColor['rgb'] }};
+    "
+>
+
     <div class="room-bg">
         <div class="glow one"></div>
         <div class="glow two"></div>
