@@ -54,11 +54,15 @@ function renderPlayerCircles(players) {
 let lastWinnerId = null;
 let soundUnlocked = false;
 
-const bellSound = new Audio('/sounds/bell.mp3');
-bellSound.preload = 'auto';
+const isAdminPage = !!document.body?.dataset?.adminGameId;
+const bellSound = isAdminPage ? new Audio('/sounds/bell.mp3') : null;
+
+if (bellSound) {
+    bellSound.preload = 'auto';
+}
 
 function unlockSound() {
-    if (soundUnlocked) return;
+    if (!isAdminPage || !bellSound || soundUnlocked) return;
 
     bellSound.play()
         .then(() => {
@@ -70,14 +74,90 @@ function unlockSound() {
 }
 
 function playBellSound() {
+    if (!isAdminPage || !bellSound) return;
+
     bellSound.currentTime = 0;
     bellSound.play().catch((error) => {
         console.log('تعذر تشغيل الصوت تلقائيًا:', error);
     });
 }
 
-document.addEventListener('click', unlockSound, { once: true });
-document.addEventListener('touchstart', unlockSound, { once: true });
+if (isAdminPage) {
+    document.addEventListener('click', unlockSound, { once: true });
+    document.addEventListener('touchstart', unlockSound, { once: true });
+}
+
+function initPlayerBuzz() {
+    const buzzButton = document.getElementById('buzz-button');
+    if (!buzzButton) return;
+
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+    const buzzUrl = buzzButton.dataset.buzzUrl;
+    const buzzNote = document.getElementById('buzz-note');
+
+    let buzzSent = false;
+
+    async function sendBuzz(event) {
+        if (event) {
+            event.preventDefault();
+        }
+
+        if (buzzSent || !buzzUrl || !csrfToken) return;
+
+        buzzSent = true;
+        buzzButton.disabled = true;
+        buzzButton.style.pointerEvents = 'none';
+        buzzButton.textContent = 'جارٍ الإرسال...';
+
+        if (buzzNote) {
+            buzzNote.textContent = 'تم إرسال الضغطة...';
+        }
+
+        try {
+            const response = await fetch(buzzUrl, {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': csrfToken,
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({}),
+                credentials: 'same-origin',
+                keepalive: true,
+            });
+
+            const data = await response.json().catch(() => null);
+
+            if (!response.ok) {
+                throw new Error(data?.message || 'تعذر تسجيل الضغطة.');
+            }
+
+            if (!data?.accepted && buzzNote) {
+                buzzNote.textContent = 'تم استلام الضغطة.';
+            }
+        } catch (error) {
+            buzzSent = false;
+            buzzButton.disabled = false;
+            buzzButton.style.pointerEvents = '';
+            buzzButton.textContent = 'اضغط';
+
+            if (buzzNote) {
+                buzzNote.textContent = 'تعذر إرسال الضغطة، حاول مرة أخرى.';
+            }
+
+            console.error(error);
+        }
+    }
+
+    buzzButton.addEventListener('pointerdown', sendBuzz);
+
+    buzzButton.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+            sendBuzz(event);
+        }
+    });
+}
 
 function initRealtime() {
     const adminGameId = document.body?.dataset?.adminGameId;
@@ -149,12 +229,31 @@ function initRealtime() {
             }
 
             if (buzzSection && resultSection) {
+                const buzzButton = document.getElementById('buzz-button');
+                const buzzNote = document.getElementById('buzz-note');
+
                 if (event.status === 'waiting') {
                     buzzSection.style.display = 'block';
                     resultSection.style.display = 'none';
+
+                    if (buzzButton) {
+                        buzzButton.disabled = false;
+                        buzzButton.style.pointerEvents = '';
+                        buzzButton.textContent = 'اضغط';
+                    }
+
+                    if (buzzNote) {
+                        buzzNote.textContent = 'أول ضغطة صحيحة تحصل على أولوية الإجابة';
+                    }
                 } else {
                     buzzSection.style.display = 'none';
                     resultSection.style.display = 'block';
+
+                    if (buzzButton) {
+                        buzzButton.disabled = true;
+                        buzzButton.style.pointerEvents = 'none';
+                    }
+
                     renderPlayerCircles(event.players);
 
                     if (winnerText) {
@@ -171,7 +270,11 @@ function initRealtime() {
 }
 
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initRealtime);
+    document.addEventListener('DOMContentLoaded', () => {
+        initPlayerBuzz();
+        initRealtime();
+    });
 } else {
+    initPlayerBuzz();
     initRealtime();
 }

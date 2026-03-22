@@ -4,77 +4,18 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>غرفة اللاعب</title>
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 
     <style>
         body {
             margin: 0;
             font-family: "Cairo", sans-serif;
-            background: linear-gradient(135deg, #081028 0%, #102a70 48%, #0f766e 100%);
+            background: linear-gradient(135deg, #0b132b 0%, #102a70 55%, #0f766e 100%);
             min-height: 100vh;
             overflow-x: hidden;
-            position: relative;
             color: #fff;
         }
-
-        .room-bg {
-            position: fixed;
-            inset: 0;
-            overflow: hidden;
-            z-index: 0;
-            pointer-events: none;
-        }
-
-        .glow {
-            position: absolute;
-            border-radius: 9999px;
-            filter: blur(90px);
-            opacity: 0.24;
-            animation: glowMove 10s ease-in-out infinite alternate;
-        }
-
-        .glow.one {
-            width: 320px;
-            height: 320px;
-            background: #38bdf8;
-            top: 60px;
-            right: 80px;
-        }
-
-        .glow.two {
-            width: 330px;
-            height: 330px;
-            background: #22c55e;
-            bottom: 40px;
-            left: 70px;
-            animation-delay: 2s;
-        }
-
-        .glow.three {
-            width: 220px;
-            height: 220px;
-            background: #f59e0b;
-            top: 45%;
-            left: 42%;
-            animation-delay: 1s;
-        }
-
-        .float-symbol {
-            position: absolute;
-            opacity: 0.12;
-            font-size: 28px;
-            animation: floatY 9s ease-in-out infinite;
-            user-select: none;
-        }
-
-        .s1 { top: 60px; right: 150px; }
-        .s2 { top: 170px; left: 110px; animation-delay: 1.2s; }
-        .s3 { top: 260px; right: 65px; animation-delay: 2.1s; }
-        .s4 { top: 410px; left: 80px; animation-delay: .7s; }
-        .s5 { bottom: 110px; right: 150px; animation-delay: 1.7s; }
-        .s6 { bottom: 70px; left: 160px; animation-delay: 2.4s; }
-        .s7 { top: 110px; left: 48%; animation-delay: .9s; }
-        .s8 { bottom: 220px; right: 46%; animation-delay: 1.5s; }
 
         .page {
             min-height: 100vh;
@@ -92,13 +33,15 @@
         }
 
         .glass-card {
-            background: rgba(255,255,255,0.11);
+            background: linear-gradient(
+                180deg,
+                rgba(255,255,255,0.14) 0%,
+                rgba(255,255,255,0.08) 100%
+            );
             border: 1px solid rgba(255,255,255,0.14);
             border-radius: 30px;
             padding: 30px 24px;
-            box-shadow: 0 24px 60px rgba(0,0,0,0.24);
-            backdrop-filter: blur(18px);
-            -webkit-backdrop-filter: blur(18px);
+            box-shadow: 0 16px 36px rgba(0,0,0,0.20);
             text-align: center;
         }
 
@@ -174,23 +117,26 @@
             color: #fff;
             background: radial-gradient(circle at top, var(--team-light), var(--team-base) 60%, var(--team-dark) 100%);
             box-shadow:
-                0 18px 40px rgba(var(--team-rgb), 0.35),
-                inset 0 8px 18px rgba(255,255,255,0.18),
-                inset 0 -10px 18px rgba(0,0,0,0.18);
-            transition: transform .15s ease, box-shadow .2s ease;
-            animation: pulseBuzzer 2s infinite;
+                0 14px 28px rgba(var(--team-rgb), 0.26),
+                inset 0 6px 14px rgba(255,255,255,0.14),
+                inset 0 -8px 14px rgba(0,0,0,0.16);
+            transition: transform .12s ease, box-shadow .16s ease;
         }
 
         .big-buzzer:hover {
-            transform: scale(1.04);
+            transform: scale(1.02);
+            box-shadow:
+                0 16px 32px rgba(var(--team-rgb), 0.30),
+                inset 0 6px 14px rgba(255,255,255,0.14),
+                inset 0 -8px 14px rgba(0,0,0,0.16);
         }
 
         .big-buzzer:active {
-            transform: scale(0.96);
+            transform: scale(0.97);
             box-shadow:
-                0 10px 20px rgba(239, 68, 68, 0.25),
-                inset 0 6px 14px rgba(255,255,255,0.12),
-                inset 0 -8px 16px rgba(0,0,0,0.22);
+                0 8px 18px rgba(var(--team-rgb), 0.22),
+                inset 0 4px 10px rgba(255,255,255,0.10),
+                inset 0 -6px 12px rgba(0,0,0,0.20);
         }
 
         .buzz-note {
@@ -325,40 +271,6 @@
             transform: translateY(-3px);
         }
 
-        @keyframes glowMove {
-            from {
-                transform: translate(0, 0) scale(1);
-            }
-            to {
-                transform: translate(18px, -18px) scale(1.06);
-            }
-        }
-
-        @keyframes floatY {
-            0%, 100% {
-                transform: translateY(0px) rotate(0deg);
-            }
-            50% {
-                transform: translateY(-18px) rotate(8deg);
-            }
-        }
-
-        @keyframes pulseBuzzer {
-            0%, 100% {
-                box-shadow:
-                    0 18px 40px rgba(var(--team-rgb), 0.35),
-                    inset 0 8px 18px rgba(255,255,255,0.18),
-                    inset 0 -10px 18px rgba(0,0,0,0.18);
-            }
-            50% {
-                box-shadow:
-                    0 22px 54px rgba(var(--team-rgb), 0.48),
-                    0 0 0 12px rgba(var(--team-rgb), 0.08),
-                    inset 0 8px 18px rgba(255,255,255,0.18),
-                    inset 0 -10px 18px rgba(0,0,0,0.18);
-            }
-        }
-
         @media (max-width: 800px) {
             .info-list {
                 grid-template-columns: 1fr;
@@ -421,24 +333,6 @@
         $teamColor = $teamPalette[$player->team_number] ?? $teamPalette[6];
     @endphp
 
-<audio id="bell-sound" preload="auto">
-    <source src="{{ asset('sounds/bell.mp3') }}" type="audio/mpeg">
-</audio>
-
-<script>
-    const bellSound = document.getElementById('bell-sound');
-
-    function playBellSound() {
-        if (!bellSound) return;
-
-        bellSound.currentTime = 0;
-
-        bellSound.play().catch((error) => {
-            console.log('تعذر تشغيل الصوت تلقائيًا:', error);
-        });
-    }
-</script>
-
 <body
     data-player-game-id="{{ $player->game->id }}"
     style="
@@ -448,21 +342,6 @@
         --team-rgb: {{ $teamColor['rgb'] }};
     "
 >
-
-    <div class="room-bg">
-        <div class="glow one"></div>
-        <div class="glow two"></div>
-        <div class="glow three"></div>
-
-        <span class="float-symbol s1">🔔</span>
-        <span class="float-symbol s2">⚡</span>
-        <span class="float-symbol s3">🎯</span>
-        <span class="float-symbol s4">✨</span>
-        <span class="float-symbol s5">🏆</span>
-        <span class="float-symbol s6">⏱️</span>
-        <span class="float-symbol s7">🎮</span>
-        <span class="float-symbol s8">⭐</span>
-    </div>
 
     <div class="page">
         <div class="room-shell">
@@ -506,12 +385,16 @@
 
                     <div id="buzz-section" style="margin-top: 10px; {{ $player->game->status === 'waiting' ? '' : 'display:none;' }}">
                         <div class="big-buzzer-wrap">
-                            <form action="{{ route('player.buzz', $player) }}" method="POST">
-                                @csrf
-                                <button type="submit" class="big-buzzer">اضغط</button>
-                            </form>
+                            <button
+                                type="button"
+                                class="big-buzzer"
+                                id="buzz-button"
+                                data-buzz-url="{{ route('player.buzz', $player) }}"
+                            >
+                                اضغط
+                            </button>
                         </div>
-                        <div class="buzz-note">أول ضغطة صحيحة تحصل على أولوية الإجابة</div>
+                        <div class="buzz-note" id="buzz-note">أول ضغطة صحيحة تحصل على أولوية الإجابة</div>
                     </div>
 
                     <div id="result-section" style="{{ $player->game->status === 'waiting' ? 'display:none;' : '' }}">

@@ -7,6 +7,7 @@ use App\Models\Game;
 use App\Models\Player;
 use Illuminate\Support\Facades\DB;
 use App\Events\GameStateUpdated;
+use Symfony\Component\HttpFoundation\Response;
 
 class GameController extends Controller
 {
@@ -127,17 +128,17 @@ class GameController extends Controller
         return back();
     }
 
-    public function buzz(Player $player)
+    public function buzz(Request $request, Player $player)
     {
         $player->load('game');
 
         $game = $player->game;
 
         if (! $game || $game->status === 'closed') {
-            return back();
+            return $this->buzzResponse($request, $player, null, false, Response::HTTP_GONE);
         }
 
-$stateChanged = false;
+        $stateChanged = false;
 
         DB::transaction(function () use ($player, $game, &$stateChanged) {
             $freshGame = Game::lockForUpdate()->find($game->id);
@@ -163,11 +164,28 @@ $stateChanged = false;
             $stateChanged = true;
         });
 
+        $freshGame = $game->fresh(['players', 'currentWinner']);
+
         if ($stateChanged) {
-            $this->broadcastGameState($game->fresh());
+            $this->broadcastGameState($freshGame);
         }
 
-        return redirect()->route('player.room', $player->id);
+        return $this->buzzResponse($request, $player, $freshGame, $stateChanged);
+    }
+
+    protected function buzzResponse(Request $request, Player $player, ?Game $game, bool $accepted, int $statusCode = Response::HTTP_OK)
+    {
+        if (! $request->expectsJson() && ! $request->ajax()) {
+            return redirect()->route('player.room', $player->id);
+        }
+
+        return response()->json([
+            'ok' => $accepted,
+            'accepted' => $accepted,
+            'status' => $game?->status,
+            'current_winner_id' => $game?->current_winner_id,
+            'current_winner_name' => optional($game?->currentWinner)->name,
+        ], $statusCode);
     }
 
     public function resetRound()
