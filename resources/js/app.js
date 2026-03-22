@@ -2,6 +2,10 @@ import '../css/app.css';
 import '../css/buzzer.css';
 import './bootstrap';
 
+let playerBuzzSent = false;
+let lastWinnerId = null;
+let soundUnlocked = false;
+
 function teamColor(teamNumber) {
     switch (Number(teamNumber)) {
         case 1: return '#3b82f6';
@@ -51,9 +55,6 @@ function renderPlayerCircles(players) {
     `).join('');
 }
 
-let lastWinnerId = null;
-let soundUnlocked = false;
-
 const isAdminPage = !!document.body?.dataset?.adminGameId;
 const bellSound = isAdminPage ? new Audio('/sounds/bell.mp3') : null;
 
@@ -95,16 +96,14 @@ function initPlayerBuzz() {
     const buzzUrl = buzzButton.dataset.buzzUrl;
     const buzzNote = document.getElementById('buzz-note');
 
-    let buzzSent = false;
-
     async function sendBuzz(event) {
         if (event) {
             event.preventDefault();
         }
 
-        if (buzzSent || !buzzUrl || !csrfToken) return;
+        if (playerBuzzSent || !buzzUrl || !csrfToken) return;
 
-        buzzSent = true;
+        playerBuzzSent = true;
         buzzButton.disabled = true;
         buzzButton.style.pointerEvents = 'none';
         buzzButton.textContent = 'جارٍ الإرسال...';
@@ -137,7 +136,7 @@ function initPlayerBuzz() {
                 buzzNote.textContent = 'تم استلام الضغطة.';
             }
         } catch (error) {
-            buzzSent = false;
+            playerBuzzSent = false;
             buzzButton.disabled = false;
             buzzButton.style.pointerEvents = '';
             buzzButton.textContent = 'اضغط';
@@ -218,8 +217,12 @@ function initRealtime() {
             const buzzSection = document.getElementById('buzz-section');
             const resultSection = document.getElementById('result-section');
             const winnerText = document.getElementById('winner-text');
+            const buzzButton = document.getElementById('buzz-button');
+            const buzzNote = document.getElementById('buzz-note');
 
             if (event.status === 'closed') {
+                playerBuzzSent = true;
+
                 if (closedBox) closedBox.style.display = 'block';
                 if (roomContent) roomContent.style.display = 'none';
                 return;
@@ -229,10 +232,9 @@ function initRealtime() {
             }
 
             if (buzzSection && resultSection) {
-                const buzzButton = document.getElementById('buzz-button');
-                const buzzNote = document.getElementById('buzz-note');
-
                 if (event.status === 'waiting') {
+                    playerBuzzSent = false;
+
                     buzzSection.style.display = 'block';
                     resultSection.style.display = 'none';
 
@@ -245,7 +247,14 @@ function initRealtime() {
                     if (buzzNote) {
                         buzzNote.textContent = 'أول ضغطة صحيحة تحصل على أولوية الإجابة';
                     }
+
+                    if (winnerText) {
+                        winnerText.style.display = 'none';
+                        winnerText.innerHTML = '';
+                    }
                 } else {
+                    playerBuzzSent = true;
+
                     buzzSection.style.display = 'none';
                     resultSection.style.display = 'block';
 
@@ -262,6 +271,7 @@ function initRealtime() {
                             winnerText.innerHTML = `صاحب أولوية الإجابة: <strong>${event.current_winner_name}</strong>`;
                         } else {
                             winnerText.style.display = 'none';
+                            winnerText.innerHTML = '';
                         }
                     }
                 }
