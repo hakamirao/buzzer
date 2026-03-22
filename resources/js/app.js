@@ -3,8 +3,16 @@ import '../css/buzzer.css';
 import './bootstrap';
 
 let playerBuzzSent = false;
+let playerBuzzInitialized = false;
+let realtimeInitialized = false;
+
 let lastWinnerId = null;
+let lastGameStatus = null;
+
 let soundUnlocked = false;
+let soundInitialized = false;
+let bellSound = null;
+let lastSoundPlayedAt = 0;
 
 function teamColor(teamNumber) {
     switch (Number(teamNumber)) {
@@ -15,6 +23,24 @@ function teamColor(teamNumber) {
         case 5: return '#8b5cf6';
         default: return '#6b7280';
     }
+}
+
+function isAdminPage() {
+    return !!document.body?.dataset?.adminGameId;
+}
+
+function getInitialWinnerId() {
+    const rawWinnerId = document.body?.dataset?.currentWinnerId;
+    return rawWinnerId ? Number(rawWinnerId) : null;
+}
+
+function getInitialGameStatus() {
+    return document.body?.dataset?.gameStatus || null;
+}
+
+function syncInitialGameStateFromBody() {
+    lastWinnerId = getInitialWinnerId();
+    lastGameStatus = getInitialGameStatus();
 }
 
 function renderAdminPlayers(players) {
@@ -55,42 +81,78 @@ function renderPlayerCircles(players) {
     `).join('');
 }
 
-const isAdminPage = !!document.body?.dataset?.adminGameId;
-const bellSound = isAdminPage ? new Audio('/sounds/bell.mp3') : null;
+function ensureBellSound() {
+    if (!isAdminPage()) return null;
 
-if (bellSound) {
-    bellSound.preload = 'auto';
+    if (!bellSound) {
+        bellSound = new Audio('/sounds/bell.mp3');
+        bellSound.preload = 'auto';
+    }
+
+    return bellSound;
 }
 
 function unlockSound() {
-    if (!isAdminPage || !bellSound || soundUnlocked) return;
+    const audio = ensureBellSound();
+    if (!audio || soundUnlocked) return;
 
-    bellSound.play()
+    const previousMuted = audio.muted;
+    audio.muted = true;
+
+    audio.play()
         .then(() => {
-            bellSound.pause();
-            bellSound.currentTime = 0;
+            audio.pause();
+            audio.currentTime = 0;
+            audio.muted = previousMuted;
             soundUnlocked = true;
         })
-        .catch(() => {});
+        .catch(() => {
+            audio.muted = previousMuted;
+        });
 }
 
 function playBellSound() {
-    if (!isAdminPage || !bellSound) return;
+    const audio = ensureBellSound();
+    if (!audio) return;
 
-    bellSound.currentTime = 0;
-    bellSound.play().catch((error) => {
+    const now = Date.now();
+
+    // يمنع التكرار السريع إذا وصل نفس الحدث مرتين أو حدث متأخر جدًا
+    if (now - lastSoundPlayedAt < 500) {
+        return;
+    }
+
+    lastSoundPlayedAt = now;
+
+    try {
+        audio.pause();
+        audio.currentTime = 0;
+    } catch (e) {}
+
+    audio.play().catch((error) => {
         console.log('تعذر تشغيل الصوت تلقائيًا:', error);
     });
 }
 
-if (isAdminPage) {
-    document.addEventListener('click', unlockSound, { once: true });
-    document.addEventListener('touchstart', unlockSound, { once: true });
+function initAdminSound() {
+    if (!isAdminPage() || soundInitialized) return;
+
+    soundInitialized = true;
+    syncInitialGameStateFromBody();
+    ensureBellSound();
+
+    document.addEventListener('pointerdown', unlockSound, { once: true, passive: true });
+    document.addEventListener('touchstart', unlockSound, { once: true, passive: true });
+    document.addEventListener('keydown', unlockSound, { once: true });
 }
 
 function initPlayerBuzz() {
+    if (playerBuzzInitialized) return;
+
     const buzzButton = document.getElementById('buzz-button');
     if (!buzzButton) return;
+
+    playerBuzzInitialized = true;
 
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
     const buzzUrl = buzzButton.dataset.buzzUrl;
@@ -159,6 +221,8 @@ function initPlayerBuzz() {
 }
 
 function initRealtime() {
+    if (realtimeInitialized) return;
+
     const adminGameId = document.body?.dataset?.adminGameId;
     const playerGameId = document.body?.dataset?.playerGameId;
     const gameId = adminGameId || playerGameId;
@@ -174,19 +238,36 @@ function initRealtime() {
         return;
     }
 
+    realtimeInitialized = true;
+    syncInitialGameStateFromBody();
+
     window.Echo.channel(`game.${gameId}`)
         .listen('.game.state.updated', (event) => {
             console.log('Realtime event received:', event);
 
+            const players = Array.isArray(event.players) ? event.players : [];
+            const currentWinnerId = event.current_winner_id ? Number(event.current_winner_id) : null;
+            const previousWinnerId = lastWinnerId;
+            const previousStatus = lastGameStatus;
+
             const shouldPlayBell =
-                event.current_winner_id &&
-                event.current_winner_id !== lastWinnerId;
+                isAdminPage() &&
+                previousStatus === 'waiting' &&
+                event.status === 'buzzed' &&
+                currentWinnerId &&
+                currentWinnerId !== previousWinnerId;
 
             if (shouldPlayBell) {
                 playBellSound();
             }
 
-            lastWinnerId = event.current_winner_id || null;
+            lastWinnerId = currentWinnerId;
+            lastGameStatus = event.status || null;
+
+            if (document.body) {
+                document.body.dataset.currentWinnerId = currentWinnerId ? String(currentWinnerId) : '';
+                document.body.dataset.gameStatus = lastGameStatus || '';
+            }
 
             const winnerBox = document.getElementById('winner-box');
             const winnerName = document.getElementById('winner-name');
@@ -200,7 +281,7 @@ function initRealtime() {
                         winnerName.textContent = event.current_winner_name;
                     }
 
-                    const winnerPlayer = event.players.find(p => p.id === event.current_winner_id);
+                    const winnerPlayer = players.find(p => Number(p.id) === currentWinnerId);
 
                     if (winnerTeam && winnerPlayer) {
                         winnerTeam.textContent = `فريق ${winnerPlayer.team_number}`;
@@ -210,7 +291,7 @@ function initRealtime() {
                 }
             }
 
-            renderAdminPlayers(event.players);
+            renderAdminPlayers(players);
 
             const closedBox = document.getElementById('closed-box');
             const roomContent = document.getElementById('room-content');
@@ -263,7 +344,7 @@ function initRealtime() {
                         buzzButton.style.pointerEvents = 'none';
                     }
 
-                    renderPlayerCircles(event.players);
+                    renderPlayerCircles(players);
 
                     if (winnerText) {
                         if (event.current_winner_name) {
@@ -281,10 +362,12 @@ function initRealtime() {
 
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
+        initAdminSound();
         initPlayerBuzz();
         initRealtime();
     });
 } else {
+    initAdminSound();
     initPlayerBuzz();
     initRealtime();
 }
